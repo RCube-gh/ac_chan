@@ -3,6 +3,20 @@ from bs4 import BeautifulSoup
 import os
 import sys
 import time
+import logging
+import re
+import json
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s: %(message)s"
+)
+
+GREEN='\033[32m'
+RED='\033[31m'
+RESET='\033[0m'
+
+PROBLEM_METADATA_FILE='metadata.json'
 
 
 def get_problem_links(contest_str):
@@ -47,6 +61,28 @@ def go_soup():
             res.raise_for_status()
             soup=BeautifulSoup(res.text,'html.parser')
 
+            # get time limit
+            time_limit=-1
+            for p in soup.find_all('p'):
+                p_text=p.text.strip()
+                if(p_text.startswith('Time Limit')):
+                    match=re.search(r"(\d+(?:\.\d+)?)\s*sec",p_text)
+                    time_limit=float(match.group(1))
+
+            problem_metadata_path=os.path.join(contest_problem_dir,PROBLEM_METADATA_FILE)
+            problem_metadata={}
+            problem_metadata['time_limit']=time_limit
+
+
+            try:
+                with open(problem_metadata_path,"w",encoding="utf-8") as f:
+                    json.dump(problem_metadata,f,indent=2,ensure_ascii=False)
+                logging.info(f"Problem {problem_id}: Saved metadata to {problem_metadata_path}")
+            except Exception as e:
+                logging.warning(f"An error occurred: {e}")
+
+
+
             in_texts=[]
             out_texts=[]
             for section in soup.select("section"):
@@ -62,12 +98,15 @@ def go_soup():
             for idx,o in enumerate(out_texts):
                 with open(os.path.join(contest_problem_dir,f"out_{idx+1}.txt"),"w",encoding="utf-8") as f:
                     f.write(o)
-            print(f"{problem_id} -> {len(in_texts)} cases saved")
+
+
+
+            logging.info(f"Problem {problem_id}: {len(in_texts)} cases saved")
         except Exception as e:
             print(f"{problem_id} failed: {e}")
 
 
-        time.sleep(1)
+        time.sleep(0.5)
 
 def main():
     go_soup()
